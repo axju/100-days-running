@@ -1,0 +1,3 @@
+dynaconf
+selenium
+chromedriver_autoinstaller
