@@ -1,3 +1,5 @@
 dynaconf
 selenium
 chromedriver_autoinstaller
+moviepy
+requests

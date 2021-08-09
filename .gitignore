@@ -139,5 +139,8 @@ cython_debug/
 
 .secrets.toml
 settings.toml
-selenium
+selenium-data
 data.json
+videos_raw
+videos
+tmp.mp4
