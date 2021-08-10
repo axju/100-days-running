@@ -141,6 +141,6 @@ cython_debug/
 settings.toml
 selenium-data
 data.json
-videos_raw
-videos
+data
 tmp.mp4
+chromedriver

@@ -2,6 +2,7 @@ import logging
 import json
 import subprocess
 import re
+import shutil
 from time import sleep
 from random import choice
 from pathlib import Path
@@ -10,9 +11,7 @@ from argparse import ArgumentParser
 
 import requests
 from dynaconf import settings
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from chromedriver_autoinstaller import install as chromedriver_installer
+import undetected_chromedriver as uc
 
 from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip
 
@@ -69,20 +68,20 @@ def get_video_raw(day=None):
     return None
 
 
-def get_browser(arguments=[]):
-    chromedriver_installer()
-    options = Options()
-    options.add_argument("user-data-dir=selenium-data")
-    for argument in arguments:
-        options.add_argument(argument)
-    browser = webdriver.Chrome(options=options)
+def get_browser():
+    options = uc.ChromeOptions()
+    options.add_argument('user-data-dir=selenium-data')
+    if settings.get('SELENIUM_HEADLESS', False):
+        options.add_argument('--no-sandbox')
+        options.add_argument('--headless')
+    browser = uc.Chrome(options=options)
     browser.implicitly_wait(5)
     return browser
 
 
 def runalyze_login(browser, username, password):
     browser.get('https://runalyze.com/dashboard')
-    sleep(5)
+    sleep(2)
     try:
         browser.find_element_by_xpath('/html/body/div[1]/div/a').click()
         sleep(2)
@@ -149,17 +148,32 @@ def tiktok_allowed_agents():
     return [item[0] for index, item in enumerate(results) if index < limit]
 
 
-def tiktok_login(browser, username, password):
-    browser.get('https://www.tiktok.com/login/phone-or-email/email')
-    sleep(2)
-    browser.find_element_by_xpath('//*[@id="root"]/div/div[1]/form/div[2]/div/input').send_keys(username)
-    browser.find_element_by_xpath('//*[@id="root"]/div/div[1]/form/div[3]/div/input').send_keys(password)
-    browser.find_element_by_xpath('//*[@id="root"]/div/div[1]/form/button').click()
+def tiktok_login(browser):
+    browser.get('https://www.tiktok.com/foryou')
     while True:
-        if browser.current_url.find('login') == -1:
+        try:
+            browser.find_element_by_xpath('//*[@id="main"]/div[1]/div/div[3]/div[4]/span/span/img')
             break
-        sleep(1)
+        except:
+            sleep(2)
     logger.info('login to tiktok')
+
+
+def tiktok_uploade(browser, path, text):
+    browser.get('https://www.tiktok.com/upload?lang=en')
+    uploade = browser.find_elements_by_class_name('upload-btn-input')[0]
+    uploade.send_keys(str(path))
+    while True:
+        try:
+            browser.find_element_by_xpath('//*[@id="main"]/div[2]/div/div[2]/div[3]/div[3]/div[2]/div[1]/img[8]')
+            break
+        except:
+            sleep(2)
+    sleep(1)
+    caption = browser.find_element_by_xpath('//*[@id="main"]/div[2]/div/div[2]/div[3]/div[1]/div[1]/div[2]/div/div[1]/div/div/div/div/div/div')
+    caption.send_keys(text)
+    sleep(1)
+    browser.find_element_by_xpath('//*[@id="main"]/div[2]/div/div[2]/div[3]/div[6]/button[2]').click()
     sleep(2)
 
 
@@ -172,10 +186,11 @@ def update():
     logger.info('update day %i %s', day, start_day)
     if len(data) < day:
         logger.info('check for new data')
-        offset = start_day + timedelta(days=len(data))
+        offset = start_day + timedelta(days=len(data) - 1)
         for item in runalyze_iter(settings.SPORT_USER, settings.SPORT_PASS, offset):
-            logger.info('add new date item for %s', item[1])
-            data.append(item)
+            if item not in data:
+                logger.info('add new date item for %s', item[1])
+                data.append(item)
     else:
         logger.info('nothing to do')
     save_data(data)
@@ -206,41 +221,50 @@ def create(day=None, delete=False):
         logger.info('Exit no raw video')
         return False
 
-    tmp_file = Path('tmp.mp4')
+    tmp_file = Path('tmp.mp4').resolve()
     subprocess.run(['ffmpeg', '-i', str(raw_video), '-metadata:s:v', 'rotate="0"', '-c:v', 'libx264', '-crf', '23', '-acodec', 'copy', '-y', str(tmp_file)])
+    raw_video.unlink()
 
     clip = VideoFileClip(str(tmp_file))
     video = CompositeVideoClip([
         clip,
-        txt_clip('Day', 0.09, 100).set_start(1).set_duration(1.4),
-        txt_clip(str(day), 0.11, 450).set_start(1.2).set_duration(1.6),
+        txt_clip('Day', 0.09, 100).set_start(0).set_duration(1.5),
+        txt_clip(str(day), 0.11, 450).set_start(0).set_duration(3),
 
-        txt_clip('of', 0.09, 100).set_start(2.8).set_duration(2),
-        txt_clip('100', 0.11, 450).set_start(3.0).set_duration(1.8),
-        txt_clip('running', 0.38, 100).set_start(3.2).set_duration(1.6),
+        txt_clip('of', 0.09, 100).set_start(3.2).set_duration(1.5),
+        txt_clip('100', 0.11, 450).set_start(3.2).set_duration(3),
+        txt_clip('running', 0.38, 100).set_start(3.2).set_duration(1.5),
 
-        txt_clip('today', 0.09, 100).set_start(5).set_duration(4),
-        txt_clip(str(data[2]) + ' km', 0.18, 200).set_start(5.2).set_duration(5.4),
-        txt_clip('total: ' + str(total) + ' km', 0.4, 80).set_start(5.4).set_duration(4.6),
+        txt_clip('today', 0.09, 100).set_start(6.4).set_duration(2),
+        txt_clip(str(data[2]), 0.14, 350).set_start(6.4).set_duration(2),
+        txt_clip('km', 0.4, 80).set_start(6.4).set_duration(2),
+
+        txt_clip('total', 0.09, 100).set_start(8.4).set_duration(2),
+        txt_clip(str(total), 0.14, 350).set_start(8.4).set_duration(2),
+        txt_clip('km', 0.4, 80).set_start(8.4).set_duration(2),
+
+        txt_clip('remaining', 0.09, 100).set_start(10.4).set_duration(2),
+        txt_clip(str(100 - day), 0.14, 350).set_start(10.4).set_duration(2),
+        txt_clip('days', 0.4, 80).set_start(10.4).set_duration(2),
     ])
     video.write_videofile(str(video_file))
     return True
 
 
-def uploade():
+def uploade(day=None):
+    if not day:
+        day = get_current_day()
+    video_file = get_video(day)
+    if not video_file.is_file():
+        logger.info('no video for current day')
+        return False
     logger.info('upload video')
-    agent = choice(tiktok_allowed_agents())
-    print(agent)
-    browser = get_browser(['--no-sandbox', f'user-agent=Naverbot'])
-    browser.header_overrides = {
-        'method': 'GET',
-        'accept-encoding': 'gzip, deflate, br',
-        'referrer': 'https://www.tiktok.com/trending',
-        'upgrade-insecure-requests': '1',
-    }
-    tiktok_login(browser, settings.TIKTOK_USER, settings.TIKTOK_PASS)
-    sleep(60)
+    browser = get_browser()
+    tiktok_login(browser)
+    tiktok_uploade(browser, video_file, 'Day {} of 100 days of running. #running #100DayChallenge #fyp #loveyoutiktok'.format(day))
+    sleep(1)
     browser.close()
+    return True
 
 
 def bot():
@@ -251,17 +275,21 @@ def bot():
             update()
             if create(current_day):
                 uploade(current_day)
-
             for i in range(60 * 60):
                 sleep(1)
         except Exception as e:
             logger.error(str(e))
 
 
+def clear_browser():
+    path = Path('selenium-data').resolve()
+    shutil.rmtree(path)
+
+
 def parse_args():
     parser = ArgumentParser(description='Automate my 10 day running reports')
     parser.add_argument('-v', '--verbose', action='count', help='verbose level... repeat up to three times.')
-    parser.add_argument('action', nargs='?', choices=['update', 'status', 'create', 'uploade', 'bot'])
+    parser.add_argument('action', nargs='?', choices=['update', 'status', 'create', 'uploade', 'bot', 'clear'])
     args = parser.parse_args()
     return parser, args
 
@@ -284,6 +312,7 @@ def main():
         'create': create,
         'uploade': uploade,
         'bot': bot,
+        'clear': clear_browser,
     }
     parser, args = parse_args()
     setup_logger(args.verbose)

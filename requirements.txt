@@ -1,5 +1,4 @@
 dynaconf
-selenium
-chromedriver_autoinstaller
+undetected_chromedriver
 moviepy
 requests
