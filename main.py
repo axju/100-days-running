@@ -60,7 +60,7 @@ def get_video(day):
 
 
 def get_video_raw(day=None):
-    video_dir = Path(settings.get('RAW_VIDEOS', 'videos_raw')).resolve()
+    video_dir = Path(settings.get('VIDEOS_RAW', 'videos_raw')).resolve()
     logger.debug('raw video dir: %s', video_dir)
     videos = [x for x in video_dir.iterdir() if x.is_file()]
     if videos:
@@ -70,7 +70,7 @@ def get_video_raw(day=None):
 
 def get_browser():
     options = uc.ChromeOptions()
-    options.add_argument('user-data-dir=selenium-data')
+    options.add_argument('user-data-dir=' + settings.get('SELENIUM_DIR', 'data/selenium'))
     if settings.get('SELENIUM_HEADLESS', False):
         options.add_argument('--no-sandbox')
         options.add_argument('--headless')
@@ -131,7 +131,7 @@ def runalyze_iter(username, password, start_date):
 
 
 def txt_clip(text, pos=0.1, size=100, color='white'):
-    txt_clip = TextClip(text, fontsize=size, color=color, font='Noto-Sans-Black')
+    txt_clip = TextClip(text, fontsize=size, color=color, stroke_color='black', stroke_width=3.5, font='Noto-Sans-Black')
     txt_clip = txt_clip.set_position(("center", pos), relative=True)
     return txt_clip
 
@@ -188,7 +188,7 @@ def update():
         logger.info('check for new data')
         offset = start_day + timedelta(days=len(data) - 1)
         for item in runalyze_iter(settings.SPORT_USER, settings.SPORT_PASS, offset):
-            if item not in data:
+            if not any([item[1] == itemm[1] for itemm in data]):
                 logger.info('add new date item for %s', item[1])
                 data.append(item)
     else:
@@ -203,15 +203,13 @@ def status():
     print('total:', timedelta(seconds=sum([item[3] for item in data])))
 
 
-def create(day=None, delete=False):
+def create(day=None):
     if not day:
         day = get_current_day()
     video_file = get_video(day)
     if video_file.is_file():
         logger.info('video already create')
-        if not delete:
-            return False
-        video_file.unlink()
+        return False
     data = get_data(day)
     total = get_total_km(day)
     raw_video = get_video_raw(day)
@@ -226,26 +224,32 @@ def create(day=None, delete=False):
     raw_video.unlink()
 
     clip = VideoFileClip(str(tmp_file))
+    clip = clip.subclip(0, 14.9)
+    frame = clip.get_frame(2)
+    if frame.shape[0] < frame.shape[1]:
+        logger.info('rotate clip')
+        clip = clip.rotate(-90)
+    frame = clip.get_frame(2)
     video = CompositeVideoClip([
         clip,
-        txt_clip('Day', 0.09, 100).set_start(0).set_duration(1.5),
-        txt_clip(str(day), 0.11, 450).set_start(0).set_duration(3),
+        txt_clip('Day', 0.09, 100).set_start(0).set_duration(2),
+        txt_clip(str(day), 0.11, 450).set_start(0.5).set_duration(1.5),
 
-        txt_clip('of', 0.09, 100).set_start(3.2).set_duration(1.5),
-        txt_clip('100', 0.11, 450).set_start(3.2).set_duration(3),
-        txt_clip('running', 0.38, 100).set_start(3.2).set_duration(1.5),
+        txt_clip('of', 0.09, 100).set_start(3).set_duration(2),
+        txt_clip('100', 0.11, 450).set_start(3).set_duration(2),
+        txt_clip('days running', 0.38, 100).set_start(3).set_duration(2),
 
-        txt_clip('today', 0.09, 100).set_start(6.4).set_duration(2),
-        txt_clip(str(data[2]), 0.14, 350).set_start(6.4).set_duration(2),
-        txt_clip('km', 0.4, 80).set_start(6.4).set_duration(2),
+        txt_clip('today', 0.09, 100).set_start(6).set_duration(2),
+        txt_clip(str(data[2]), 0.14, 350).set_start(6.5).set_duration(1.5),
+        txt_clip('km', 0.4, 80).set_start(6).set_duration(2),
 
-        txt_clip('total', 0.09, 100).set_start(8.4).set_duration(2),
-        txt_clip(str(total), 0.14, 350).set_start(8.4).set_duration(2),
-        txt_clip('km', 0.4, 80).set_start(8.4).set_duration(2),
+        txt_clip('total', 0.09, 100).set_start(8).set_duration(2),
+        txt_clip(str(total), 0.14, 350).set_start(8.5).set_duration(1.5),
+        txt_clip('km', 0.4, 80).set_start(8).set_duration(2),
 
-        txt_clip('remaining', 0.09, 100).set_start(10.4).set_duration(2),
-        txt_clip(str(100 - day), 0.14, 350).set_start(10.4).set_duration(2),
-        txt_clip('days', 0.4, 80).set_start(10.4).set_duration(2),
+        txt_clip('remaining', 0.09, 100).set_start(10).set_duration(2),
+        txt_clip(str(100 - day), 0.14, 350).set_start(10.5).set_duration(1.5),
+        txt_clip('days', 0.4, 80).set_start(10).set_duration(2),
     ])
     video.write_videofile(str(video_file))
     return True
@@ -258,13 +262,20 @@ def uploade(day=None):
     if not video_file.is_file():
         logger.info('no video for current day')
         return False
-    logger.info('upload video')
+    logger.info('upload video to tiktok')
     browser = get_browser()
     tiktok_login(browser)
-    tiktok_uploade(browser, video_file, 'Day {} of 100 days of running. #running #100DayChallenge #fyp #loveyoutiktok'.format(day))
+    tiktok_uploade(browser, video_file, 'Day {} of 100 days running. #running #100DayChallenge #fyp #loveyoutiktok'.format(day))
     sleep(1)
     browser.close()
     return True
+
+
+def login():
+    browser = get_browser()
+    tiktok_login(browser)
+    sleep(1)
+    browser.close()
 
 
 def bot():
@@ -289,7 +300,7 @@ def clear_browser():
 def parse_args():
     parser = ArgumentParser(description='Automate my 10 day running reports')
     parser.add_argument('-v', '--verbose', action='count', help='verbose level... repeat up to three times.')
-    parser.add_argument('action', nargs='?', choices=['update', 'status', 'create', 'uploade', 'bot', 'clear'])
+    parser.add_argument('action', nargs='?', choices=['update', 'status', 'create', 'uploade', 'bot', 'clear', 'login'])
     args = parser.parse_args()
     return parser, args
 
@@ -313,6 +324,7 @@ def main():
         'uploade': uploade,
         'bot': bot,
         'clear': clear_browser,
+        'login': login,
     }
     parser, args = parse_args()
     setup_logger(args.verbose)
