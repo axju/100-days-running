@@ -61,8 +61,14 @@ def get_video(day):
 
 def get_video_raw(day=None):
     video_dir = Path(settings.get('VIDEOS_RAW', 'videos_raw')).resolve()
+    video_dir_left = video_dir / 'left'
+    video_dir_right = video_dir / 'right'
     logger.debug('raw video dir: %s', video_dir)
-    videos = [x for x in video_dir.iterdir() if x.is_file()]
+    videos = []
+    for directory in [video_dir, video_dir_left, video_dir_right]:
+        videos += [x for x in directory.iterdir() if x.is_file()]
+    # videos += [x for x in video_dir.iterdir() if x.is_file()]
+    # videos += [x for x in video_dir.iterdir() if x.is_file()]
     if videos:
         return choice(videos)
     return None
@@ -194,6 +200,7 @@ def update():
     else:
         logger.info('nothing to do')
     save_data(data)
+    return data
 
 
 def status():
@@ -205,7 +212,7 @@ def status():
 
 def create(day=None):
     if not day:
-        day = get_current_day()
+        day = len(get_data())
     video_file = get_video(day)
     if video_file.is_file():
         logger.info('video already create')
@@ -221,15 +228,17 @@ def create(day=None):
 
     tmp_file = Path('tmp.mp4').resolve()
     subprocess.run(['ffmpeg', '-i', str(raw_video), '-metadata:s:v', 'rotate="0"', '-c:v', 'libx264', '-crf', '23', '-acodec', 'copy', '-y', str(tmp_file)])
-    raw_video.unlink()
 
     clip = VideoFileClip(str(tmp_file))
     clip = clip.subclip(0, 14.9)
-    frame = clip.get_frame(2)
-    if frame.shape[0] < frame.shape[1]:
-        logger.info('rotate clip')
+
+    if str(raw_video.parent).endswith('left'):
+        logger.info('rotate clip left')
         clip = clip.rotate(-90)
-    frame = clip.get_frame(2)
+    if str(raw_video.parent).endswith('right'):
+        logger.info('rotate clip right')
+        clip = clip.rotate(90)
+
     video = CompositeVideoClip([
         clip,
         txt_clip('Day', 0.09, 100).set_start(0).set_duration(2),
@@ -252,6 +261,7 @@ def create(day=None):
         txt_clip('days', 0.4, 80).set_start(10).set_duration(2),
     ])
     video.write_videofile(str(video_file))
+    raw_video.unlink()
     return True
 
 
@@ -282,8 +292,8 @@ def bot():
     logger.info('running bot')
     while True:
         try:
-            current_day = get_current_day()
-            update()
+            data = update()
+            current_day = len(data)
             if create(current_day):
                 uploade(current_day)
             for i in range(60 * 60):

@@ -4,6 +4,8 @@
 https://github.com/Zulko/moviepy/issues/401
 
 
+fix audio: https://github.com/Zulko/moviepy/issues/876#issuecomment-442212509
+
 [default]
 START_DAY = '2021-07-31'
 SPORT_USER = 'username'
