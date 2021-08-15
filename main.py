@@ -45,6 +45,12 @@ def get_current_day():
     return (datetime.now().date() - start_day).days + 1
 
 
+def get_last_create_day():
+    video_dir = Path(settings.get('VIDEOS', 'videos')).resolve()
+    videos = [0] + [int(x.stem) for x in video_dir.iterdir() if x.is_file()]
+    return max(videos)
+
+
 def get_total_km(day=None):
     data = get_data()
     if day:
@@ -67,8 +73,6 @@ def get_video_raw(day=None):
     videos = []
     for directory in [video_dir, video_dir_left, video_dir_right]:
         videos += [x for x in directory.iterdir() if x.is_file()]
-    # videos += [x for x in video_dir.iterdir() if x.is_file()]
-    # videos += [x for x in video_dir.iterdir() if x.is_file()]
     if videos:
         return choice(videos)
     return None
@@ -294,7 +298,8 @@ def bot():
         try:
             data = update()
             current_day = len(data)
-            if create(current_day):
+            last_day = get_last_create_day() + 1
+            if current_day >= last_day and create(last_day):
                 uploade(current_day)
             for i in range(60 * 60):
                 sleep(1)
