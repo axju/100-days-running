@@ -119,12 +119,14 @@ def runalyze_search(browser, start_date):
         row_data = [td.text for td in row.find_elements_by_xpath(".//td")]
         if row_data[0] == '':
             continue
-        minutes, secends = row_data[6].split(':')
+        values = row_data[6].split(':')
+        hours = 0 if len(values) < 3 else int(values[0])
+        minutes, secends = int(values[-2]), int(values[-1])
         yield [
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             datetime.strptime(row_data[0] + row_data[16], '%d.%m.%Y%H:%M'),
             float(row_data[3].split()[0].replace(',', '.')),
-            int(minutes) * 60 + int(secends)
+            hours * 60 * 60 + minutes * 60 + secends
         ]
 
 
