@@ -6,7 +6,7 @@ import shutil
 from time import sleep
 from random import choice
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from argparse import ArgumentParser
 
 import requests
@@ -65,7 +65,7 @@ def get_video(day):
     return video_dir / '{}.mp4'.format(day)
 
 
-def get_video_raw(day=None):
+def get_video_raw(data=None):
     video_dir = Path(settings.get('VIDEOS_RAW', 'videos_raw')).resolve()
     video_dir_left = video_dir / 'left'
     video_dir_right = video_dir / 'right'
@@ -73,6 +73,19 @@ def get_video_raw(day=None):
     videos = []
     for directory in [video_dir, video_dir_left, video_dir_right]:
         videos += [x for x in directory.iterdir() if x.is_file()]
+    if data is not None:
+        time_begin, time_end = time(0, 0, 0), time(23, 59, 59)
+        if data[1].time() < time(8, 0, 0):
+            time_begin, time_end = time(0, 0, 0), time(8, 0, 0)
+        elif time(8, 0, 0) < data[1].time() < time(21, 0, 0):
+            time_begin, time_end = time(8, 0, 0), time(21, 0, 0)
+        video_filter = []
+        for video in videos:
+            video_time = datetime.strptime(re.split('_|\.', str(video.name))[-2], '%H%M%S').time()
+            if time_begin < video_time < time_end:
+                video_filter.append(video)
+        if video_filter:
+            return choice(video_filter)
     if videos:
         return choice(videos)
     return None
@@ -225,7 +238,7 @@ def create(day=None):
         return False
     data = get_data(day)
     total = get_total_km(day)
-    raw_video = get_video_raw(day)
+    raw_video = get_video_raw(data)
     logger.info('create video for day=%i, date=%s, total=%fkm, raw_video=%s', day, data[1], total, raw_video)
 
     if raw_video is None:
