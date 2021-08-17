@@ -261,7 +261,7 @@ def create(day=None):
     video = CompositeVideoClip([
         clip,
         txt_clip('Day', 0.09, 100).set_start(0).set_duration(2),
-        txt_clip(str(day), 0.11, 450).set_start(0.5).set_duration(1.5),
+        txt_clip(str(day), 0.11, 450).set_start(0).set_duration(2),
 
         txt_clip('of', 0.09, 100).set_start(3).set_duration(2),
         txt_clip('100', 0.11, 450).set_start(3).set_duration(2),
