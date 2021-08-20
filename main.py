@@ -193,13 +193,13 @@ def tiktok_uploade(browser, path, text):
             browser.find_element_by_xpath('//*[@id="main"]/div[2]/div/div[2]/div[3]/div[3]/div[2]/div[1]/img[8]')
             break
         except:
-            sleep(2)
-    sleep(1)
+            sleep(5)
+    sleep(5)
     caption = browser.find_element_by_xpath('//*[@id="main"]/div[2]/div/div[2]/div[3]/div[1]/div[1]/div[2]/div/div[1]/div/div/div/div/div/div')
     caption.send_keys(text)
-    sleep(1)
+    sleep(5)
     browser.find_element_by_xpath('//*[@id="main"]/div[2]/div/div[2]/div[3]/div[6]/button[2]').click()
-    sleep(2)
+    sleep(10)
 
 
 def update():
@@ -272,7 +272,7 @@ def create(day=None):
         txt_clip('km', 0.4, 80).set_start(6).set_duration(2),
 
         txt_clip('total', 0.09, 100).set_start(8).set_duration(2),
-        txt_clip(str(total), 0.14, 350).set_start(8.5).set_duration(1.5),
+        txt_clip('{:5.1f}'.format(total), 0.14, 350).set_start(8.5).set_duration(1.5),
         txt_clip('km', 0.4, 80).set_start(8).set_duration(2),
 
         txt_clip('remaining', 0.09, 100).set_start(10).set_duration(2),
@@ -291,7 +291,7 @@ def uploade(day=None):
     if not video_file.is_file():
         logger.info('no video for current day')
         return False
-    logger.info('upload video to tiktok')
+    logger.info('upload video %i to tiktok', day)
     browser = get_browser()
     tiktok_login(browser)
     tiktok_uploade(browser, video_file, 'Day {} of 100 days running. #running #100DayChallenge #fyp #loveyoutiktok'.format(day))
